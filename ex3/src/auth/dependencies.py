@@ -1,4 +1,4 @@
-from fastapi import Request, HTTPException, status, Depends
+from fastapi import Request, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -10,6 +10,7 @@ from src.errors import (
     RefreshTokenRequired,
     AccessTokenRequired,
     InsufficientPermission,
+    AccountNotVerified,
 )
 
 from .service import UserService
@@ -30,7 +31,6 @@ class TokenBearer(HTTPBearer):
 
         token = creds.credentials
 
-
         token_data = decode_token(token)
 
         if not self.token_valid(token):
@@ -38,7 +38,6 @@ class TokenBearer(HTTPBearer):
 
         if await token_in_blocklist(token_data['jti']):
             raise InvalidToken()
-
 
         token_data = decode_token(token)
 
@@ -84,6 +83,9 @@ class RoleChecker:
         self.allowed_roles = allowed_roles
 
     async def __call__(self, current_user: User = Depends(get_current_user)):
+
+        if not current_user.is_verified:
+            raise AccountNotVerified()
 
         if current_user.role in self.allowed_roles:
             return True
